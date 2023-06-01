@@ -29,8 +29,8 @@ const HomePage = () => {
           <div className="bg-white shadow-lg p-6">
             <h2 className="text-2xl font-bold mb-4">My Projects</h2>
             <ul className="list-disc list-inside text-gray-700">
-              <li>Project 1</li>
-              <li>Project 2</li>
+              <li>Project 1 commit</li>
+              <li>Project 2 commit</li>
               <li>Project 3</li>
             </ul>
           </div>
