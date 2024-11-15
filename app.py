@@ -459,4 +459,3 @@ def index():
 
 #     # Extract the reply
 #     bot_reply = response.query_result.fulfillment_text
-#     return jsonify({'reply': bot_reply})
