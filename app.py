@@ -1,3 +1,7 @@
+#venv/bin/python app.py to run app
+# ngrok http 5001    
+
+
 from flask import Flask, request, jsonify, render_template
 from static_data import price_list, item_name_mapping, size_required_items, menu_items
 from flask_cors import CORS
@@ -48,6 +52,14 @@ def create_response(message):
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
+        req = request.get_json(silent=True, force=True)
+        user_message = req.get('message')
+
+        if user_message:
+            # Process the user's message
+            bot_response = f"You said: {user_message}"  # Example response
+            return jsonify({'fulfillmentText': bot_response})
+        
         print("\n=== WEBHOOK REQUEST ===")
         req = request.get_json(silent=True, force=True)
 
@@ -313,5 +325,5 @@ def index():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5001))
     app.run(host='0.0.0.0', port=port)
