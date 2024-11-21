@@ -143,7 +143,8 @@ size_required_items = [
     "Frosted Lemonade",
     "Frosted Coffee",
     "Milkshake",
-    "Peppermint Chocolate Chip Milkshake"
+    "Peppermint Chocolate Chip Milkshake",
+    "Nuggets"
 ]
 
 menu_items = {

@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Chick-fil-A Chatbot</title>
     <style>
         /* Add your styles here */
     </style>
 </head>
+
 <body>
     <div id="chat-container">
-        <div id="chat-window">
-            <div id="messages"></div>
-        </div>
-        <input type="text" id="user-input" placeholder="Type your message here..." autocomplete="off" />
-        <button id="send-button">Send</button>
+        <script src="https://www.gstatic.com/dialogflow-console/fast/messenger/bootstrap.js?v=1"></script>
+        <df-messenger intent="WELCOME" chat-title="CFA_Agent" agent-id="71047fca-9202-4f21-b7d4-954499272531"
+            language-code="en"></df-messenger>
     </div>
 
     <script>
@@ -46,14 +46,15 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text })
             })
-            .then(response => response.json())
-            .then(data => {
-                appendMessage('bot-message', data.reply);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+                .then(response => response.json())
+                .then(data => {
+                    appendMessage('bot-message', data.reply);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
         }
     </script>
 </body>
+
 </html>

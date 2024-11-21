@@ -3,6 +3,7 @@ from static_data import price_list, item_name_mapping, size_required_items, menu
 from flask_cors import CORS
 import os
 import json
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -101,27 +102,45 @@ def webhook():
             'ReviewOrder',
             'OrderCompletion',
             'ConfirmOrder',
-            'Default Welcome Intent'
+            'Default Welcome Intent',
+            'ProvideNuggetCount'
         ]
         print(
             f"Is intent '{intent_name}' in handled intents? {intent_name in HANDLED_INTENTS}")
 
         if intent_name == 'OrderFood':
             food_items = parameters.get('FoodItem', [])
-            size = parameters.get('Size', '')
+
+            count = parameters.get('Count', '')  # Check if Count is provided
 
             for food_item in food_items:
                 mapped_item = item_name_mapping.get(food_item, food_item)
 
-                # If no size was specified for items that need size, ask for it
+                # Check if it's nuggets and whether Count is provided
+                if mapped_item.lower() == "nuggets":
+                    if count not in ["8-count", "12-count"]:  # If count is missing or invalid
+                        return jsonify({
+                            'fulfillmentText': "Would you like 8-count or 12-count nuggets?",
+                            'outputContexts': [
+                                {
+                                    'name': f"{session_id}/contexts/nugget_followup",  # Define the context dynamically
+                                    'lifespanCount': 2,  # Set the lifespan for 2 turns
+                                    'parameters': {  # Store necessary parameters for follow-up
+                                        'item': 'Nuggets',
+                                        'quantity': 1
+                                    }
+                                }
+                            ]
+                        })
+
+                # Handle other food items (existing logic)
+                size = parameters.get('Size', '')
                 if mapped_item in size_required_items and not size:
                     last_ordered_item[session_id] = {
                         'item': mapped_item,
                         'quantity': 1
                     }
-                    return jsonify({
-                        'fulfillmentText': f"What size would you like for your {food_item}? (Small, Medium, or Large)"
-                    })
+                    return create_response(f"What size would you like for your {food_item}? (Small, Medium, or Large)")
 
                 # Add size if needed
                 if mapped_item in size_required_items and size:
@@ -136,7 +155,8 @@ def webhook():
                 orders[session_id].append(order_item)
                 print(f"Added to order: {order_item}")
 
-                return create_response(f"1 {full_item_name} has been added to your cart. Would you like anything else?")
+                return create_response(f"{full_item_name} has been added to your cart. Would you like anything else?")
+
 
         elif intent_name == 'OrderFood - size':
             size = parameters.get('size', '')
@@ -192,6 +212,51 @@ def webhook():
                 del last_ordered_item[session_id]  # Clear the pending item
 
                 return create_response(f"I've added {quantity} {full_item_name} to your order. Would you like anything else?")
+        elif intent_name == 'ProvideNuggetCount':
+            # Extract contexts from the request
+            context = query_result.get('outputContexts', [])
+            nugget_context = next(
+                (ctx for ctx in context if 'nugget_followup' in ctx.get('name', '')), {}
+            )
+
+            # Retrieve parameters from the context
+            pending_item = nugget_context.get('parameters', {})
+            item = pending_item.get('item', 'Nuggets')
+            raw_count_input = query_result.get('queryText', '')  # User's full response text
+
+            # Use regex to extract numbers (e.g., "8" or "12") from the input
+            match = re.search(r'\b(8|12)\b', raw_count_input)  # Look for "8" or "12"
+            if match:
+                extracted_count = match.group(1)  # Extract the matched number as a string
+                normalized_count = f"{extracted_count}-count"  # Normalize to "8-count" or "12-count"
+            else:
+                normalized_count = None
+
+            if normalized_count:  # If a valid count was extracted
+                full_item_name = f"{item} ({normalized_count})"
+                order_item = {
+                    'food_item': full_item_name,
+                    'quantity': 1
+                }
+                orders[session_id].append(order_item)
+                print(f"Added to order: {order_item}")
+
+                # Respond with confirmation and clear the follow-up context
+                return jsonify({
+                    'fulfillmentText': f"{full_item_name} has been added to your order. Would you like anything else?",
+                    'outputContexts': [
+                        {
+                            'name': f"{session_id}/contexts/orderfood-followup",
+                            'lifespanCount': 2,
+                            'parameters': {}
+                        }
+                    ]
+                })
+            else:
+                # If no valid count was found, re-prompt the user
+                return create_response("We only offer 8-count or 12-count nuggets. Please choose one.")
+
+
 
         elif intent_name == 'SandwichSpicyOrNot':
             return create_response("Would you like your chicken sandwich original or spicy?")
@@ -260,7 +325,7 @@ def webhook():
             for item in order_items:
                 quantity = item.get('quantity', 1)
                 food_item = item['food_item']
-                order_summary += f"{quantity} x {food_item}\n"
+                order_summary += f"{quantity} x {food_item} (${price:.2f} each\n"
 
             total_price = calculate_total(order_items)
             # Clear the order after confirmation
