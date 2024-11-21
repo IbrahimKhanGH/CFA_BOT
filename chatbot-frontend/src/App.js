@@ -10,17 +10,21 @@ function App() {
   const sendMessage = async () => {
     if (input.trim() === "") return;
 
-    // Append user message to the chat
+    // Append the user's message to the chat
     const newMessages = [...messages, { sender: "user", text: input }];
     setMessages(newMessages);
     setInput(""); // Clear input field
 
     try {
-      const response = await axios.post("http://127.0.0.1:5001/webhook", {
-        message: input,
-      });
+      // Send the user's message to the Flask backend
+      const response = await axios.post(
+        "https://0975-153-33-34-165.ngrok-free.app/webhook",
+        {
+          message: input,
+        }
+      );
 
-      // Append bot's response to the chat
+      // Append the bot's response to the chat
       setMessages([
         ...newMessages,
         { sender: "bot", text: response.data.fulfillmentText || "No response" },
@@ -29,7 +33,7 @@ function App() {
       console.error("Error sending message:", error);
       setMessages([
         ...newMessages,
-        { sender: "bot", text: "Error: Unable to reach the server." },
+        { sender: "bot", text: "Error: Unable to connect to the server." },
       ]);
     }
   };

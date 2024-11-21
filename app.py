@@ -1,12 +1,17 @@
 #venv/bin/python app.py to run app
 # ngrok http 5001    
 
-
 from flask import Flask, request, jsonify, render_template
 from static_data import price_list, item_name_mapping, size_required_items, menu_items
 from flask_cors import CORS
 import os
 import json
+import dialogflow_v2 as dialogflow
+from google.oauth2 import service_account
+from google.auth.credentials import Credentials
+import json
+
+
 
 app = Flask(__name__)
 CORS(app)
@@ -47,6 +52,42 @@ def create_response(message):
             }
         ]
     })
+
+
+# Dialogflow service account key (replace with your key as a string)
+service_account_key = """{
+  "type": "service_account",
+  "project_id": "fast-food-chatbot",
+  "private_key_id": "477fd4de4ea96de8d4d706310d962aa514c0dbdd",
+  "private_key": "-----BEGIN PRIVATE KEY-----\\n477fd4de4ea96de8d4d706310d962aa514c0dbdd\\n-----END PRIVATE KEY-----\\n",
+  "client_email": "sharunnaicker@gmail.com",
+  "client_id": "your-client-id",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "your-client-x509-cert-url"
+}"""
+
+# Parse the JSON key
+service_account_info = json.loads(service_account_key)
+credentials = Credentials.from_service_account_info(service_account_info)
+
+# Dialogflow project ID
+project_id = service_account_info["fast-food-chatbot"]
+
+
+def detect_intent_texts(project_id, session_id, text, language_code):
+    """Send a text query to Dialogflow and return the result."""
+    session_client = dialogflow.SessionsClient(credentials=credentials)
+    session = session_client.session_path(project_id, session_id)
+
+    text_input = dialogflow.types.TextInput(text=text, language_code=language_code)
+    query_input = dialogflow.types.QueryInput(text=text_input)
+
+    response = session_client.detect_intent(
+        request={"session": session, "query_input": query_input}
+    )
+    return response.query_result.fulfillment_text
 
 
 @app.route('/webhook', methods=['POST'])
