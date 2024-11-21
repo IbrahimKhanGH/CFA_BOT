@@ -1,59 +1,64 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>Chick-fil-A Chatbot</title>
     <style>
-        /* Add your styles here */
+      /* Add your styles here */
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div id="chat-container">
-        <div id="chat-window">
-            <div id="messages"></div>
-        </div>
-        <input type="text" id="user-input" placeholder="Type your message here..." autocomplete="off" />
-        <button id="send-button">Send</button>
+      <div id="chat-window">
+        <div id="messages"></div>
+      </div>
+      <input
+        type="text"
+        id="user-input"
+        placeholder="Type your message here..."
+        autocomplete="off"
+      />
+      <button id="send-button">Send</button>
     </div>
 
     <script>
-        const messagesDiv = document.getElementById('messages');
-        const userInput = document.getElementById('user-input');
-        const sendButton = document.getElementById('send-button');
+      const messagesDiv = document.getElementById("messages");
+      const userInput = document.getElementById("user-input");
+      const sendButton = document.getElementById("send-button");
 
-        sendButton.addEventListener('click', sendMessage);
-        userInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-
-        function appendMessage(sender, text) {
-            const message = document.createElement('div');
-            message.className = sender;
-            message.innerText = text;
-            messagesDiv.appendChild(message);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      sendButton.addEventListener("click", sendMessage);
+      userInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") {
+          sendMessage();
         }
+      });
 
-        function sendMessage() {
-            const text = userInput.value.trim();
-            if (text === '') return;
-            appendMessage('user-message', text);
-            userInput.value = '';
+      function appendMessage(sender, text) {
+        const message = document.createElement("div");
+        message.className = sender;
+        message.innerText = text;
+        messagesDiv.appendChild(message);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
 
-            fetch('/send_message', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text })
-            })
-            .then(response => response.json())
-            .then(data => {
-                appendMessage('bot-message', data.reply);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-        }
+      function sendMessage() {
+        const text = userInput.value.trim();
+        if (text === "") return;
+        appendMessage("user-message", text);
+        userInput.value = "";
+
+        fetch("/send_message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            appendMessage("bot-message", data.reply);
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+          });
+      }
     </script>
-</body>
+  </body>
 </html>
