@@ -123,10 +123,18 @@ price_list = {
 
 # Item name mapping and size required items
 item_name_mapping = {
-    "Waffle Fries": "Waffle Potato Fries",
-    "Milkshake": "Milkshake",
+    'waffle fries': 'Waffle Potato Fries',
+    'fries': 'Waffle Potato Fries',
+    'fry': 'Waffle Potato Fries',
+    'milkshake': 'Milkshake',
+    'shake': 'Milkshake',
+    'iced tea': 'Freshly-Brewed Iced Tea',
+    'tea': 'Freshly-Brewed Iced Tea',
+    'iced coffee': 'Iced Coffee',
+    'coffee': 'Iced Coffee',
     # Add other mappings as needed
 }
+
 
 size_required_items = {
     "Waffle Potato Fries": "Waffle Potato Fries",

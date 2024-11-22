@@ -223,62 +223,70 @@ def webhook():
             f"Is intent '{intent_name}' in handled intents? {intent_name in HANDLED_INTENTS}")
 
         if intent_name == 'OrderFood':
+            query_text = query_result.get('queryText', '').lower()
             food_items = parameters.get('FoodItem', [])
             sizes = parameters.get('Size', [])
-            numbers = parameters.get('number', [])
-            query = query_text.lower()
-
-            # Initialize order items if not exists
+            
+            # Get the context for original items and numbers
+            contexts = query_result.get('outputContexts', [])
+            order_context = next((ctx for ctx in contexts if 'orderfood-followup' in ctx['name']), None)
+            
+            if order_context and 'parameters' in order_context:
+                original_items = order_context['parameters'].get('FoodItem.original', [])
+                original_numbers = order_context['parameters'].get('number.original', [])
+                original_sizes = order_context['parameters'].get('Size.original', [])
+            
+            # Initialize session orders if needed
             if session_id not in orders:
                 orders[session_id] = []
-
-            # Initialize index for sizes
-            size_idx = 0
-
-            for idx, food_item in enumerate(food_items):
-                # Map the food item name to the menu item
-                mapped_item = item_name_mapping.get(food_item, food_item)
-
-                # Determine quantity
-                if idx < len(numbers) and numbers[idx]:
-                    quantity = int(numbers[idx])
-                else:
-                    quantity = 1  # Default quantity
-
-                # Determine if the item requires a size
-                if mapped_item in size_required_items:
-                    if size_idx < len(sizes):
-                        size = sizes[size_idx]
-                        size_idx += 1  # Move to the next size for subsequent items
-                    else:
-                        size = 'Medium'  # Default size
-                    full_item_name = f"{mapped_item} ({size})"
-                else:
-                    full_item_name = mapped_item
-
-                # Add the item to the order
-                order_item = {
-                    'food_item': full_item_name,
-                    'quantity': quantity
-                }
-                orders[session_id].append(order_item)
-                print(f"Added item: {full_item_name} (Quantity: {quantity})")
-
-            # Create order summary
-            order_summary = []
-            for item in orders[session_id]:
-                order_summary.append(f"{item['quantity']} x {item['food_item']}")
-
-            # Set context for additional items
-            awaiting_more_items[session_id] = True
-
-            if order_summary:
-                response = "I've added to your order:\n" + "\n".join(order_summary)
-                response += "\nWould you like anything else?"
+            
+            # Split the query into individual items
+            items = re.split(r',\s*(?:and\s+)?|\s+and\s+', query_text)
+            items = [item.strip() for item in items if item.strip()]
+            
+            # Process each item
+            for item in items:
+                # Extract quantity
+                quantity = 1
+                quantity_match = re.search(r'(\d+)', item)
+                if quantity_match:
+                    quantity = int(quantity_match.group(1))
+                
+                # Extract size
+                size = 'Medium'  # default
+                if 'large' in item:
+                    size = 'Large'
+                elif 'small' in item:
+                    size = 'Small'
+                elif 'medium' in item:
+                    size = 'Medium'
+                
+                # Determine item type and add to order
+                if 'spicy' in item and ('sandwich' in item or 'chicken' in item):
+                    orders[session_id].append({
+                        'food_item': 'Spicy Chicken Sandwich',
+                        'quantity': quantity
+                    })
+                elif 'fry' in item or 'fries' in item:
+                    orders[session_id].append({
+                        'food_item': f'Waffle Potato Fries ({size})',
+                        'quantity': quantity
+                    })
+                elif any(drink in item for drink in ['drink', 'coke', 'sprite']):
+                    orders[session_id].append({
+                        'food_item': f'Soft Drink ({size})',
+                        'quantity': quantity
+                    })
+            
+            # Create response with current order
+            if orders[session_id]:
+                items_text = []
+                for item in orders[session_id]:
+                    items_text.append(f"{item['quantity']} {item['food_item']}")
+                response = f"I've added {', '.join(items_text)} to your order. Would you like anything else?"
                 return create_response(response)
-            else:
-                return create_response("I couldn't understand the items you want to order. Could you please rephrase your order?")
-
+            
+            return create_response("I didn't catch that. What would you like to order?")
 
         elif intent_name == 'OrderFood - size':
             size = parameters.get('size', '')
@@ -323,22 +331,59 @@ def webhook():
                 'item': 'nuggets'
             }
             return create_response("Would you like regular or grilled nuggets?")
-
         elif intent_name == 'ModifyOrder':
-            action = parameters.get('ModifyAction', '')
-            item = parameters.get('FoodItem', '')
-
+            print("Processing ModifyOrder intent...")
+            action = parameters.get('ModifyAction', '').lower()
+            food_items = parameters.get('FoodItem', [])
+            sizes = parameters.get('Size', [])
+            
+            if not isinstance(food_items, list):
+                food_items = [food_items]
+            if not isinstance(sizes, list):
+                sizes = [sizes]
+            
+            if session_id not in orders:
+                return create_response("You don't have any items in your order yet.")
+            
             if action == 'remove':
-                orders[session_id] = [order for order in orders[session_id]
-                                      if order['food_item'] != item]
-                return jsonify({
-                    'fulfillmentText': f"I've removed {item} from your order."
-                })
-            elif action == 'clear':
-                orders[session_id] = []
-                return jsonify({
-                    'fulfillmentText': "I've cleared your order. What would you like to order?"
-                })
+                items_removed = []
+                items_not_found = []
+                current_orders = orders[session_id].copy()  # Create a copy to safely modify
+                
+                for food_item in food_items:
+                    found = False
+                    # Map the item name
+                    mapped_item = item_name_mapping.get(food_item.lower(), food_item)
+                    
+                    # Try to find and remove the item
+                    for i, order_item in enumerate(current_orders):
+                        # Check for both exact match and partial match (e.g., "fries" matches "Waffle Potato Fries")
+                        if (mapped_item.lower() in order_item['food_item'].lower() or 
+                            food_item.lower() in order_item['food_item'].lower()):
+                            items_removed.append(f"{order_item['quantity']} {order_item['food_item']}")
+                            current_orders.pop(i)
+                            found = True
+                            break
+                    
+                    if not found:
+                        items_not_found.append(food_item)
+                
+                # Update the orders with the modified list
+                orders[session_id] = current_orders
+                
+                # Create response message
+                if items_removed:
+                    response = f"I've removed {', '.join(items_removed)} from your order."
+                    if items_not_found:
+                        response += f" I couldn't find {', '.join(items_not_found)}."
+                else:
+                    response = f"I couldn't find {', '.join(items_not_found)} in your order."
+                
+                print(f"Current order after removal: {orders[session_id]}")
+                return create_response(response)
+            
+            return create_response("I'm not sure what you want to modify. Would you like to remove something from your order?")
+
 
         elif intent_name == 'SandwichSpicyOrNot':
             if session_id not in awaiting_menu_response:
