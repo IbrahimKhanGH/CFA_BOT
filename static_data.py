@@ -123,6 +123,9 @@ price_list = {
 
 # Item name mapping and size required items
 item_name_mapping = {
+    "original chicken sandwich": "Original Chicken Sandwich",
+    "regular chicken sandwich": "Original Chicken Sandwich",
+    "original sandwich": "Original Chicken Sandwich",
     'waffle fries': 'Waffle Potato Fries',
     'fries': 'Waffle Potato Fries',
     'fry': 'Waffle Potato Fries',
