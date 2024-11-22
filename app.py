@@ -171,7 +171,8 @@ HANDLED_INTENTS = [
     'OrderNuggets',
     'NuggetType',
     'NuggetCount',
-    'OrderNuggets'
+    'OrderNuggets',
+    'ClearOrder'
 ]
 
 @app.route('/webhook', methods=['POST'])
@@ -331,6 +332,8 @@ def webhook():
                 'item': 'nuggets'
             }
             return create_response("Would you like regular or grilled nuggets?")
+        
+
         elif intent_name == 'ModifyOrder':
             print("Processing ModifyOrder intent...")
             action = parameters.get('ModifyAction', '').lower()
@@ -343,12 +346,12 @@ def webhook():
                 sizes = [sizes]
             
             if session_id not in orders:
-                return create_response("You don't have any items in your order yet.")
+                return create_response("You don't have any items in your order yet. Would you like to start ordering?")
             
             if action == 'remove':
                 items_removed = []
                 items_not_found = []
-                current_orders = orders[session_id].copy()  # Create a copy to safely modify
+                current_orders = orders[session_id].copy()
                 
                 for food_item in food_items:
                     found = False
@@ -357,7 +360,6 @@ def webhook():
                     
                     # Try to find and remove the item
                     for i, order_item in enumerate(current_orders):
-                        # Check for both exact match and partial match (e.g., "fries" matches "Waffle Potato Fries")
                         if (mapped_item.lower() in order_item['food_item'].lower() or 
                             food_item.lower() in order_item['food_item'].lower()):
                             items_removed.append(f"{order_item['quantity']} {order_item['food_item']}")
@@ -371,18 +373,37 @@ def webhook():
                 # Update the orders with the modified list
                 orders[session_id] = current_orders
                 
-                # Create response message
+                # Create response message with follow-up
                 if items_removed:
-                    response = f"I've removed {', '.join(items_removed)} from your order."
+                    response = f"I've removed {', '.join(items_removed)} from your order. "
                     if items_not_found:
-                        response += f" I couldn't find {', '.join(items_not_found)}."
+                        response += f"I couldn't find {', '.join(items_not_found)}. "
+                    response += "Would you like anything else?"
                 else:
-                    response = f"I couldn't find {', '.join(items_not_found)} in your order."
+                    response = f"I couldn't find {', '.join(items_not_found)} in your order. What would you like to modify?"
                 
                 print(f"Current order after removal: {orders[session_id]}")
                 return create_response(response)
             
             return create_response("I'm not sure what you want to modify. Would you like to remove something from your order?")
+        
+        elif intent_name == 'ClearOrder':
+            # Check if there's actually an order to clear
+            has_order = any([
+                session_id in orders and orders[session_id],
+                session_id in pending_orders,
+                session_id in last_ordered_item,
+                session_id in awaiting_order_confirmation,
+                session_id in awaiting_menu_response,
+                session_id in awaiting_more_items
+            ])
+            
+            if has_order:
+                # Use the existing clear_session_data function
+                clear_session_data(session_id)
+                return create_response("Your order has been cleared. What would you like to order now?")
+            else:
+                return create_response("You don't have any active orders. Would you like to start ordering?")
 
 
         elif intent_name == 'SandwichSpicyOrNot':
@@ -663,6 +684,13 @@ def webhook():
                 return create_response(f"I've added {nugget_item} to your order. Would you like anything else?")
             else:
                 return create_response("I'm not sure what type of nuggets you'd like. Would you like regular or grilled nuggets?")
+
+        elif intent_name == 'ClearOrder':
+            if session_id in orders and orders[session_id]:
+                orders[session_id] = []  # Clear the order
+                clear_session_data(session_id)  # Clear all session data
+                return create_response("I've cleared your order. What would you like to order?")
+            return create_response("You don't have any items in your order. Would you like to start a new order?")
 
         elif intent_name:  # If we have an intent name but didn't handle it
             print(f"WARNING: Unhandled intent: {intent_name}")
